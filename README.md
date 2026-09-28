@@ -1,26 +1,19 @@
 # Steam Deck `/joy` Mapper for ROS 2
 
-A tool for mapping every physical control on a Steam Deck's built-in
-controller to its exact `sensor_msgs/msg/Joy` index in ROS 2 — so you
-can configure teleoperation (`teleop_twist_joy` or any custom mapper)
-without guessing from generic Xbox-controller documentation.
-
-The Steam Deck controller shows up in Linux as:
+If you're trying to use a Steam Deck's built-in controller for ROS 2 teleop, you'll hit the same wall I did: the controller shows up in Linux as
 
 ```
 /dev/input/event10
 Microsoft X-Box 360 pad 0
 ```
 
-That evdev name is misleading — it's the built-in Steam Deck
-controller, not an actual Xbox pad, and its `/joy` layout doesn't
-match a standard Xbox mapping. This repo gives you the real mapping,
-confirmed control-by-control against a live `/joy` feed.
+...which makes you think you can just use a standard Xbox mapping. You can't. The Deck's `/joy` output doesn't line up with the usual layout, and there's no official mapping published anywhere. So I sat down with a controller in one hand and `ros2 topic echo /joy` in the other and mapped every control by hand.
 
-## Mapping
+This repo has that mapping, plus the script I used to get it, in case you want to re-verify it on your own hardware or adapt it for a different controller entirely.
 
-`/joy` reports 20 buttons and 8 axes. The physical controls below were
-tested directly:
+## The mapping
+
+`/joy` reports 20 buttons and 8 axes. Here's what maps to what:
 
 ### Buttons
 
@@ -51,86 +44,54 @@ tested directly:
 | D-pad X         | axes[6]   | left = +1, right = -1 (inverted)    |
 | D-pad Y         | axes[7]   | up = +1, down = -1                  |
 
-Full write-up with additional notes: [`docs/steamdeck_joy_mapping.md`](docs/steamdeck_joy_mapping.md).
+One issue: the sticks and D-pad are inverted from what you'd expect - right and down are usually positive, here they're negative. Just flip the sign in your `teleop_twist_joy` config and move on.
 
-**Note on polarity:** left/right stick and D-pad axes are inverted
-from the usual convention (normally right/down are positive). Account
-for this with negative scale factors in your `teleop_twist_joy` config
-or downstream mapping node.
+More detail in [`docs/steamdeck_joy_mapping.md`](docs/steamdeck_joy_mapping.md) if you want it.
 
-## Repo contents
+## What's included
 
 ```
 .
 ├── README.md
 ├── LICENSE
 ├── scripts/
-│   ├── joy_mapper.py           # Interactive /joy button & axis mapper
-│   └── joy_node.launch.py      # Convenience launch wrapper for the stock `joy` package's joy_node
+│   ├── joy_mapper.py           # the interactive mapper
+│   └── joy_node.launch.py      # launch wrapper for joy_node
 └── docs/
-    └── steamdeck_joy_mapping.md  # Full mapping reference
+    └── steamdeck_joy_mapping.md
 ```
 
-> `joy_node` itself is part of ROS 2's standard `joy` package
-> (`ros-<distro>-joy`) — it's not custom code. `joy_node.launch.py` is
-> just a thin convenience wrapper so it can be launched the same way
-> as the rest of this project if you prefer `ros2 launch` over
-> `ros2 run`.
+Quick note: `joy_node` comes with ROS 2's standard `joy` package. The launch file here just wraps it for convenience.
 
-## Usage
+## Using it
 
-### 1. Start `joy_node`
+Start `joy_node` first:
 
 ```bash
 source install/setup.bash
 ros2 run joy joy_node
 ```
 
-(or `ros2 launch scripts/joy_node.launch.py`)
-
-This publishes `sensor_msgs/msg/Joy` on `/joy`. Leave it running.
-
-Sanity check:
+Make sure it's actually publishing:
 
 ```bash
 ros2 topic echo /joy
 ```
 
-You should see `buttons` and `axes` arrays change as you touch the
-controller.
+You should see the arrays move when you touch the controller. If nothing moves, stop here and sort that out first.
 
-### 2. Run the mapper
+Then run the mapper:
 
 ```bash
 python3 scripts/joy_mapper.py
 ```
 
-The script walks through every control one at a time:
+It'll ask you to press one control at a time — "press A," you press A, it tells you which index just changed. Ten second window per control, and if nothing happens in that window it logs it as not registered instead of hanging forever. At the end you get a full summary you can paste straight into a doc.
 
-1. Prompts you with the control to press (e.g. `A`).
-2. Captures a clean baseline of `/joy` while your hands are off the
-   controller.
-3. Gives you 10 seconds to press or move that control.
-4. Diffs the new `/joy` message against the baseline and reports
-   exactly which `buttons[]`/`axes[]` index changed — no assumptions
-   about whether the control is digital or analog.
-5. Logs `NOT REGISTERED` for anything that doesn't change within the
-   time limit.
+## Why it's built this way
 
-At the end it prints a full summary table, ready to drop into a
-mapping doc like the one in this repo.
-
-## Why it works
-
-Earlier mapping attempts tried to guess what *kind* of input to expect
-(e.g. "wait for a button press") and broke down because buttons can
-stay held, axes don't return exactly to zero, the D-pad is reported as
-axes rather than buttons, triggers are analog, and the Steam Deck's
-layout isn't a clean generic Xbox layout. This mapper sidesteps all of
-that by asking the simplest possible question — "what's the first
-thing in the whole `/joy` message that changes after a clean
-baseline?" — and letting ROS answer directly.
+My first attempt tried to guess what kind of input was coming - "wait for a button press," "wait for an axis to move." However buttons stay held down, axes barely ever land exactly on zero, the D-pad reports as axes instead of buttons, triggers are analog, and the Deck's layout just isn't a normal Xbox layout. So instead of guessing, the script just asks the dumbest possible question - "what's the first thing that's different from a line ago?" - and lets ROS answer that itself. Much less fragile.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
