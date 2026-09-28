@@ -90,7 +90,7 @@ It'll ask you to press one control at a time — "press A," you press A, it tell
 
 ## Why it's built this way
 
-My first attempt tried to guess what kind of input was coming - "wait for a button press," "wait for an axis to move." However buttons stay held down, axes barely ever land exactly on zero, the D-pad reports as axes instead of buttons, triggers are analog, and the Deck's layout just isn't a normal Xbox layout. So instead of guessing, the script just asks the dumbest possible question - "what's the first thing that's different from a line ago?" - and lets ROS answer that itself. Much less fragile.
+My first attempt tried to guess what kind of input was coming - "wait for a button press," "wait for an axis to move." However buttons stay held down, axes barely ever land exactly on zero, the D-pad reports as axes instead of buttons, triggers are analog, and the Deck's layout just isn't a normal Xbox layout. So instead of guessing, the script just asks the simplest possible question - "what's the first thing that's different from a line ago?" - and lets ROS answer that itself. Much less fragile.
 
 ## License
 
